@@ -1,6 +1,6 @@
 ﻿# NASA Space Apps - AirSense
 
-AirSense is a monorepo built for NASA Space Apps. It delivers a Spring Boot backend that normalizes air quality readings and a Vite/React dashboard that turns those readings into actionable, rule-based guidance—no LLMs required.
+AirSense is a monorepo built for NASA Space Apps. It delivers a Spring Boot backend that normalizes air quality readings and a Vite/React dashboard that turns those readings into actionable, rule-based guidance.
 
 ## Features
 - **Rule-driven AQI intelligence** sourced from a mock OpenAQ client with a clear extension point for real APIs.
