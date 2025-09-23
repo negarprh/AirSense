@@ -1,0 +1,24 @@
+﻿# Maven & Java
+backend/target/
+*.class
+*.log
+
+# Node & Vite
+frontend/node_modules/
+frontend/dist/
+
+# IDE & build helpers
+.idea/
+.project
+.classpath
+.settings/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+
+# Docker artifacts
+**/.DS_Store
+*.iml

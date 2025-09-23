@@ -1,0 +1,56 @@
+﻿version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: aqi_postgres
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - aqi_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: aqi_backend
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:${POSTGRES_PORT}/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SERVER_PORT: ${BACKEND_PORT}
+      EDL_TOKEN: ${EDL_TOKEN}
+      TEMPO_COLLECTION_SHORTNAME: ${TEMPO_COLLECTION_SHORTNAME}
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_PORT}:8080"
+
+  frontend:
+    build: ./frontend
+    container_name: aqi_frontend
+    env_file:
+      - .env
+    environment:
+      VITE_API_BASE: http://localhost:${BACKEND_PORT}
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT}:5173"
+
+volumes:
+  aqi_pg:
