@@ -1,8 +1,9 @@
-﻿# NASA Space Apps - AirSense
+﻿﻿# NASA Space Apps - AirSense
 
-AirSense is a monorepo built for NASA Space Apps. It delivers a Spring Boot backend that normalizes air quality readings and a Vite/React dashboard that turns those readings into actionable, rule-based guidance—no LLMs required.
+AirSense is a monorepo built for NASA Space Apps. It delivers a Spring Boot backend that normalizes air quality readings and a Vite/React dashboard that turns those readings into actionable, rule-based guidance.
 
 ## Features
+
 - **Rule-driven AQI intelligence** sourced from a mock OpenAQ client with a clear extension point for real APIs.
 - **Deterministic health advice** that tightens guidance for asthma-sensitive users.
 - **In-memory caching** to avoid duplicate upstream calls for the same city/day.
@@ -11,6 +12,7 @@ AirSense is a monorepo built for NASA Space Apps. It delivers a Spring Boot back
 - **springdoc-openapi** available at `/swagger-ui` for quick API exploration.
 
 ## Getting Started
+
 1. Copy the sample environment file:
    ```bash
    cp .env.example .env
@@ -29,21 +31,25 @@ AirSense is a monorepo built for NASA Space Apps. It delivers a Spring Boot back
    - API Health Check: http://localhost:8080/api/health
 
 Shut down and remove containers/volumes:
+
 ```bash
 docker compose down -v
 ```
 
 Tail backend logs:
+
 ```bash
 docker compose logs -f backend
 ```
 
 Run backend unit tests inside the container:
+
 ```bash
 docker compose exec backend ./mvnw -q -DskipITs test
 ```
 
 ## Architecture Notes
+
 - **Backend** (`backend/`): Spring Boot 3 (Java 21), Spring Web, Spring Data JPA, Validation, PostgreSQL driver, springdoc-openapi. AQI data is mocked via a deterministic generator and cached in-memory per `(city, date)`.
 - **Frontend** (`frontend/`): Vite + React + TypeScript single page app with reusable components for search, AQI visualization, and guidance.
 - **Database**: PostgreSQL 16 container with persistent volume `aqi_pg`.
@@ -51,16 +57,19 @@ docker compose exec backend ./mvnw -q -DskipITs test
 - **Docker**: Multi-stage backend image and lightweight Node dev container for Vite; orchestrated via `docker-compose.yml`.
 
 ## API Overview
+
 - `GET /api/health` → `{ "status": "ok" }`
 - `GET /api/aqi?city={CityName}` → Returns normalized AQI payload with 24-hour history and metadata.
 - `GET /api/advice?city={CityName}&asthma=true|false` → Returns rule-based advice, automatically stricter for asthma-sensitive users.
 - `GET /actuator/health` → Spring Boot actuator health endpoint.
 
 ## Testing
+
 - `HealthApiTest` verifies the custom health endpoint.
 - `AdviceServiceTest` ensures rule-band logic (including asthma adjustment) behaves deterministically.
 
 ## NEXT STEPS
+
 1. Replace the mock OpenAQ client with real API calls.
 2. Add Earthdata/TEMPO integration when credentials are available.
 3. Optional: add i18n strings (EN/FR) for advice texts.

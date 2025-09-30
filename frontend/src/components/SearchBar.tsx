@@ -25,27 +25,28 @@ const SearchBar = ({ city, asthma, loading = false, onSearch }: SearchBarProps) 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="search-form">
-      <label>
-        <span>City</span>
+    <form className="search-card" onSubmit={handleSubmit}>
+      <div className="search-row">
         <input
           type="text"
           value={localCity}
           onChange={(event) => setLocalCity(event.target.value)}
-          placeholder="Enter a city"
+          placeholder="Search for a city..."
+          aria-label="City name"
+          className="search-input"
         />
-      </label>
-      <label className="checkbox">
+        <button type="submit" disabled={loading} className="search-button">
+          {loading ? "Searching..." : "Search"}
+        </button>
+      </div>
+      <label className="search-toggle">
         <input
           type="checkbox"
           checked={localAsthma}
           onChange={(event) => setLocalAsthma(event.target.checked)}
         />
-        <span>Asthma or respiratory sensitivity</span>
+        <span>Include guidance for asthma or sensitive airways</span>
       </label>
-      <button type="submit" disabled={loading}>
-        {loading ? "Loading..." : "Check AQI"}
-      </button>
     </form>
   );
 };

@@ -1,7 +1,8 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useState } from "react";
 import { api, AqiResponse, AdviceResponse } from "./api";
 import SearchBar from "./components/SearchBar";
 import AqiResult from "./components/AqiResult";
+import backgroundVisual from "/images/background.jpg";
 
 function App() {
   const [city, setCity] = useState("Los Angeles");
@@ -10,10 +11,15 @@ function App() {
   const [adviceData, setAdviceData] = useState<AdviceResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const fetchData = async (searchCity: string, asthmaFlag: boolean) => {
-    if (!searchCity.trim()) {
+    const trimmed = searchCity.trim();
+    if (!trimmed) {
       setError("Please enter a city name.");
+      setHasSearched(false);
+      setAqiData(null);
+      setAdviceData(null);
       return;
     }
 
@@ -22,26 +28,25 @@ function App() {
 
     try {
       const aqiResponse = await api.get<AqiResponse>("/api/aqi", {
-        params: { city: searchCity }
+        params: { city: trimmed }
       });
       setAqiData(aqiResponse.data);
 
       const adviceResponse = await api.get<AdviceResponse>("/api/advice", {
-        params: { city: searchCity, asthma: asthmaFlag }
+        params: { city: trimmed, asthma: asthmaFlag }
       });
       setAdviceData(adviceResponse.data);
+      setHasSearched(true);
     } catch (err) {
       console.error(err);
-      setError("Unable to fetch AQI data right now. Please try again later.");
+      setError("Unable to fetch air quality right now. Try again in a moment.");
+      setHasSearched(true);
+      setAqiData(null);
+      setAdviceData(null);
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    void fetchData(city, asthma);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleSearch = (searchCity: string, asthmaFlag: boolean) => {
     setCity(searchCity);
@@ -49,20 +54,35 @@ function App() {
     void fetchData(searchCity, asthmaFlag);
   };
 
+  const resultActive = hasSearched || loading || !!error;
+
   return (
-    <div className="main" style={{ maxWidth: 600, padding: 16 }}>
-      <SearchBar
-        city={city}
-        asthma={asthma}
-        onSearch={handleSearch}
-        loading={loading}
-      />
-      <AqiResult
-        aqi={aqiData}
-        advice={adviceData}
-        asthma={asthma}
-        error={error}
-      />
+    <div className="app-background" style={{ backgroundImage: `url(${backgroundVisual})` }}>
+      <div className="app-overlay">
+        <header className="hero">
+          <h1>Welcome to AirSense</h1>
+          <p>Where you can sense the clear air</p>
+        </header>
+
+        <SearchBar
+          city={city}
+          asthma={asthma}
+          onSearch={handleSearch}
+          loading={loading}
+        />
+
+        {resultActive && (
+          <div className={`result-wrapper ${resultActive ? "visible" : ""}`}>
+            <AqiResult
+              aqi={aqiData}
+              advice={adviceData}
+              asthma={asthma}
+              error={error}
+              loading={loading}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
