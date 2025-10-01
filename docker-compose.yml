@@ -33,7 +33,6 @@ services:
       SERVER_PORT: ${BACKEND_PORT}
       EDL_TOKEN: ${EDL_TOKEN}
       TEMPO_COLLECTION_SHORTNAME: ${TEMPO_COLLECTION_SHORTNAME}
-
     depends_on:
       postgres:
         condition: service_healthy
@@ -43,14 +42,23 @@ services:
   frontend:
     build: ./frontend
     container_name: aqi_frontend
+    working_dir: /app
     env_file:
       - .env
     environment:
-      VITE_API_BASE: http://localhost:${BACKEND_PORT}
+      # Use the backend service name on the Docker network for API calls:
+      VITE_API_BASE: http://backend:${BACKEND_PORT}
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true" # ensures file watching works in Docker Desktop/WSL
+      WATCHPACK_POLLING: "true"
     depends_on:
       - backend
     ports:
       - "${FRONTEND_PORT}:5173"
+    volumes:
+      - ./frontend:/app # live-mount your source
+      - /app/node_modules # keep container's node_modules usable with the mount
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
 
 volumes:
   aqi_pg:
