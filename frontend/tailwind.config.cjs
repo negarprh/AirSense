@@ -14,6 +14,10 @@ module.exports = {
       boxShadow: {
         glow: "0 16px 32px rgba(15, 35, 57, 0.65)",
       },
+      fontFamily: {
+        rubikDistressed: ['"Rubik Distressed"', 'cursive'],
+        bellota: ['"Bellota Text"', 'cursive'],
+      },
     },
   },
   plugins: [],

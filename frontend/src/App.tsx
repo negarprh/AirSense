@@ -60,7 +60,7 @@ function App() {
     <div className="app-background" style={{ backgroundImage: `url(${backgroundVisual})` }}>
       <div className="app-overlay">
         <header className="hero">
-          <h1>Welcome to AirSense</h1>
+          <h1 className="hero-title">Welcome to AirSense</h1>
           <p>Where you can sense the clear air</p>
         </header>
 
