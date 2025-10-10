@@ -2,6 +2,10 @@
 backend/target/
 *.class
 *.log
+# Spring Boot configuration
+backend/src/main/resources/application.properties
+backend/src/main/resources/application.yml
+
 
 # Node & Vite
 frontend/node_modules/
