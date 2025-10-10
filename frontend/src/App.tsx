@@ -5,7 +5,7 @@ import InsightsPage from "./pages/InsightsPage";
 import backgroundVisual from "/images/background.jpg";
 
 function App() {
-  const [city, setCity] = useState("Los Angeles");
+  const [city, setCity] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
   const [landingError, setLandingError] = useState<string | null>(null);
 
@@ -50,7 +50,7 @@ function App() {
             path="/insights"
             element={
               <InsightsPage
-                key={city}              // <— forces a fresh mount on city change
+                key={city}              // force a fresh mount on city change
                 city={city}
                 hasSearched={hasSearched}
                 onBack={handleBackToSearch}

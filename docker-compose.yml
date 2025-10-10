@@ -1,43 +1,18 @@
-﻿version: "3.9"
+version: "3.9"
 
 services:
-  postgres:
-    image: postgres:16
-    container_name: aqi_postgres
-    env_file:
-      - .env
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "${POSTGRES_PORT}:5432"
-    volumes:
-      - aqi_pg:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   backend:
     build: ./backend
     container_name: aqi_backend
     env_file:
       - .env
     environment:
-      SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:${POSTGRES_PORT}/${POSTGRES_DB}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      SERVER_PORT: ${BACKEND_PORT}
-      EDL_TOKEN: ${EDL_TOKEN}
-      TEMPO_COLLECTION_SHORTNAME: ${TEMPO_COLLECTION_SHORTNAME}
-    depends_on:
-      postgres:
-        condition: service_healthy
+      # Spring Boot reads this env var
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
+      # optional: SERVER_PORT=8080
     ports:
-      - "${BACKEND_PORT}:8080"
+      - "${BACKEND_PORT:-8080}:8080"
+    restart: unless-stopped
 
   frontend:
     build: ./frontend
@@ -46,19 +21,17 @@ services:
     env_file:
       - .env
     environment:
-      # Use the backend service name on the Docker network for API calls:
-      VITE_API_BASE: http://backend:${BACKEND_PORT}
+      # INSIDE docker, talk to backend via service DNS, not localhost
+      VITE_API_BASE: http://backend:8080
       NODE_ENV: development
-      CHOKIDAR_USEPOLLING: "true" # ensures file watching works in Docker Desktop/WSL
+      CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
     depends_on:
       - backend
     ports:
-      - "${FRONTEND_PORT}:5173"
+      - "${FRONTEND_PORT:-5173}:5173"
     volumes:
-      - ./frontend:/app # live-mount your source
-      - /app/node_modules # keep container's node_modules usable with the mount
+      - ./frontend:/app
+      - /app/node_modules
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
-
-volumes:
-  aqi_pg:
+    restart: unless-stopped

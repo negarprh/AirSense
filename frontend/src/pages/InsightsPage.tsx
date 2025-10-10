@@ -22,13 +22,14 @@ const statusVariants = {
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -10 }
 };
+
 const CATEGORY_STEPS: Array<{ threshold: number; info: CategoryInfo }> = [
   {
     threshold: 50,
     info: {
       image: "green",
       label: "Good",
-      accent: "#4ade80",
+      accent: "#22c55e",
       range: "AQI 0-50 | Minimal risk",
       summary: "Air quality is clean. Outdoor activities are encouraged for everyone.",
       guidance: {
@@ -108,30 +109,36 @@ const CATEGORY_STEPS: Array<{ threshold: number; info: CategoryInfo }> = [
     }
   }
 ];
+
 const categoryForAqi = (aqi: number): CategoryInfo => {
   for (const step of CATEGORY_STEPS) {
     if (aqi <= step.threshold) return step.info;
   }
   return CATEGORY_STEPS[CATEGORY_STEPS.length - 1].info;
 };
+
 const formatObservationDetails = (iso?: string) => {
   if (!iso) return { local: "Unknown", relative: "" };
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return { local: iso, relative: "" };
+
   const local = date.toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit"
   });
+
   const diffMs = date.getTime() - Date.now();
   const absMs = Math.abs(diffMs);
   const fmt = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+
   if (absMs < 60_000) return { local, relative: fmt.format(Math.round(diffMs / 1000), "second") };
   if (absMs < 3_600_000) return { local, relative: fmt.format(Math.round(diffMs / 60_000), "minute") };
   if (absMs < 86_400_000) return { local, relative: fmt.format(Math.round(diffMs / 3_600_000), "hour") };
   return { local, relative: fmt.format(Math.round(diffMs / 86_400_000), "day") };
 };
+
 const toTitleCase = (value: string) =>
   value
     .split(/\s+/)
@@ -142,7 +149,9 @@ const toTitleCase = (value: string) =>
       return lower.charAt(0).toUpperCase() + lower.slice(1);
     })
     .join(" ");
+
 const isAscii = (value: string) => /^[\x00-\x7F]+$/.test(value);
+
 const formatDistance = (meters?: number | null) => {
   if (meters == null || Number.isNaN(meters)) return null;
   if (meters >= 1000) {
@@ -151,21 +160,34 @@ const formatDistance = (meters?: number | null) => {
   }
   return `${Math.round(meters)} m away`;
 };
+
+// helper to convert hex to rgba transparency
+const hexToRgba = (hex: string, a: number) => {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+};
+
+
 const InsightsPage = ({ city, hasSearched, onBack }: InsightsPageProps) => {
   const [data, setData] = useState<AqiResponse | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
   useEffect(() => {
     if (!hasSearched || !city) return;
+
     const controller = new AbortController();
+
     const load = async () => {
       setLoading(true);
       setFetchError(null);
       setData(null);
       try {
-        // InsightsPage.tsx (inside load())
         const response = await api.get<AqiResponse>("/api/aqi", {
-          params: { city, _ts: Date.now() },   // cache buster
+          params: { city, _ts: Date.now() },
           signal: controller.signal
         });
         setData(response.data);
@@ -178,164 +200,200 @@ const InsightsPage = ({ city, hasSearched, onBack }: InsightsPageProps) => {
         if (!controller.signal.aborted) setLoading(false);
       }
     };
+
     void load();
     return () => controller.abort();
   }, [city, hasSearched]);
+
   const category = useMemo(() => {
     if (!data || data.aqi == null) return null;
     return categoryForAqi(data.aqi);
   }, [data]);
+
   const accent = category?.accent ?? "#4ade80";
+
   const cardStyle = useMemo<CSSProperties | undefined>(() => {
     if (!category) return undefined;
     return {
       borderColor: `${accent}55`,
-      boxShadow: `0 20px 60px ${accent}22`,
-      background: `linear-gradient(135deg, ${accent}1f 0%, rgba(7, 18, 32, 0.88) 60%, rgba(4, 12, 24, 0.95) 100%)`
+      boxShadow: `0 28px 68px ${accent}22`,
+      background: `linear-gradient(140deg, ${accent}22 0%, rgba(6, 18, 32, 0.9) 65%, rgba(4, 12, 26, 0.96) 100%)`
     };
   }, [category, accent]);
+
   const displayCity = useMemo(() => {
-    const primary = (data?.resolved ?? "").split(",")[0]?.trim() ?? "";
-    if (primary && isAscii(primary)) return toTitleCase(primary);
+    const resolved = (data?.resolved ?? "").split(",")[0]?.trim() ?? "";
+    if (resolved && isAscii(resolved)) return toTitleCase(resolved);
     const fallback = data?.query ?? city;
     return fallback ? toTitleCase(fallback) : "";
   }, [data?.query, data?.resolved, city]);
+
   const pm25Unit = data?.unit ?? "ug/m3";
+
   const observationDetails = useMemo(
     () => formatObservationDetails(data?.observedUtc),
     [data?.observedUtc]
   );
-  // Prevent rendering an object as a React child
+
   const stationLabel = useMemo(() => {
     if (!data) return null;
-    const stationRaw = data.station;
+    const raw = data.station;
     let label: string | null = null;
-    if (typeof stationRaw === "string" && stationRaw.trim()) {
-      label = stationRaw.trim();
-    } else if (stationRaw && typeof stationRaw === "object") {
-      const coords = stationRaw as StationCoords;
+
+    if (typeof raw === "string" && raw.trim()) {
+      label = raw.trim();
+    } else if (raw && typeof raw === "object") {
+      const coords = raw as StationCoords;
       if (typeof coords.latitude === "number" && typeof coords.longitude === "number") {
         label = `${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`;
       }
     }
+
     const locality = data.locality?.trim();
     const country = data.country?.trim();
     const parts = [label, locality, country].filter(Boolean) as string[];
+
     const distance = formatDistance(data.stationDistanceMeters);
     if (distance) parts.push(distance);
-    return parts.length ? parts.join(" | ") : null;
+
+    return parts.length ? parts.join(" • ") : null;
   }, [data]);
+
   const content = () => {
-  if (!hasSearched) {
+    if (!hasSearched) {
+      return (
+        <motion.div className="insights-status" variants={statusVariants} initial="initial" animate="animate">
+          Start with a city search to see live readings.
+        </motion.div>
+      );
+    }
+
+    if (loading) {
+      return (
+        <motion.div className="insights-status" variants={statusVariants} initial="initial" animate="animate">
+          Checking the air around you...
+        </motion.div>
+      );
+    }
+
+    if (fetchError) {
+      return (
+        <motion.div className="insights-status insights-status-error" variants={statusVariants} initial="initial" animate="animate">
+          {fetchError}
+        </motion.div>
+      );
+    }
+
+    if (!data) return null;
+
+    if (data.pm25 == null || data.aqi == null || !category) {
+      const message = data.message ?? "No air quality data available.";
+      return (
+        <motion.div className="insights-status" variants={statusVariants} initial="initial" animate="animate">
+          {message}
+        </motion.div>
+      );
+    }
+
     return (
-      <motion.div className="insights-status" variants={statusVariants} initial="initial" animate="animate">
-        Start with a city search to see live readings.
-      </motion.div>
-    );
-  }
-  if (loading) {
-    return (
-      <motion.div className="insights-status" variants={statusVariants} initial="initial" animate="animate">
-        Checking the air around you...
-      </motion.div>
-    );
-  }
-  if (fetchError) {
-    return (
-      <motion.div className="insights-status insights-status-error" variants={statusVariants} initial="initial" animate="animate">
-        {fetchError}
-      </motion.div>
-    );
-  }
-  if (!data) return null;
-  if (data.pm25 == null || data.aqi == null || !category) {
-    const message = data.message ?? "No air quality data available.";
-    return (
-      <motion.div className="insights-status" variants={statusVariants} initial="initial" animate="animate">
-        {message}
-      </motion.div>
-    );
-  }
-  return (
-    <div className="insights-output-shell">
-      <motion.div
-        className="insights-spotlight"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-      >
-        <div className="insights-photo" style={{ borderColor: `${accent}33` }}>
-          <img src={`/images/${category.image}.jpg`} alt={`${category.label} air quality visual`} />
-        </div>
-        <div className="typing-card" style={cardStyle}>
-          <span className="typing-kicker" style={{ color: category.accent }}>
-            {category.label} air quality
-          </span>
-          <div className="city-heading">
-            <h2>{displayCity || city}</h2>
-            {data.countryCode && (
-              <span className="country-chip" style={{ borderColor: `${accent}66`, color: category.accent }}>
-                {data.countryCode}
-              </span>
+      <div className="insights-output-shell">
+        <motion.div
+          className="insights-spotlight"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          <div className="insights-photo" style={{ borderColor: `${accent}33` }}>
+            <img src={`/images/${category.image}.jpg`} alt={`${category.label} air quality visual`} />
+          </div>
+
+          <div className="typing-card" style={cardStyle}>
+            <span className="typing-kicker" style={{ color: category.accent }}>
+              {category.label} air quality
+            </span>
+            <div className="city-heading">
+              <h2>{displayCity || city}</h2>
+              {data.countryCode && (
+                <span className="country-chip" style={{ borderColor: `${accent}66`, color: category.accent }}>
+                  {data.countryCode}
+                </span>
+              )}
+            </div>
+            <p className="typing-description">{category.range}</p>
+
+            <div className="insights-metrics">
+              <div
+  className="metric-card metric-card--accent"
+  style={{
+    borderColor: hexToRgba(accent, 0.6),
+    background: `linear-gradient(160deg, ${hexToRgba(accent, 0.35)} 0%, rgba(6,16,32,0.9) 90%)`,
+    boxShadow: `0 18px 46px ${hexToRgba(accent, 0.22)}`
+  }}
+>
+  <span className="metric-label">AQI</span>
+  <span className="metric-value">{data.aqi}</span>
+  <span className="metric-sub">{category.summary}</span>
+</div>
+
+              <div className="metric-card">
+                <span className="metric-label">PM2.5</span>
+                <span className="metric-value">{data.pm25.toFixed(1)}</span>
+                <span className="metric-sub">{pm25Unit}</span>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">Observed</span>
+                <span className="metric-value">{observationDetails.local}</span>
+                {observationDetails.relative && <span className="metric-sub">{observationDetails.relative}</span>}
+              </div>
+            </div>
+
+            <div className="insights-guidance-grid">
+              <div className="guidance-card">
+                <h3>General population</h3>
+                <p>{category.guidance.general}</p>
+              </div>
+              <div className="guidance-card">
+                <h3>Sensitive groups</h3>
+                <p>{category.guidance.sensitive}</p>
+              </div>
+            </div>
+
+            {stationLabel && (
+              <p className="insights-provenance">
+                Data source: <strong>{stationLabel}</strong>
+              </p>
             )}
+
+            {/* {data.health_advice && <p className="additional-health-note">{data.health_advice}</p>} */}
           </div>
-          <p className="typing-description">{category.range}</p>
-          <div className="insights-metrics">
-            <div className="metric-card metric-card--accent" style={{ borderColor: `${accent}66`, background: `linear-gradient(160deg, ${accent}3d 0%, rgba(6,16,32,0.85) 90%)` }}>
-              <span className="metric-label">AQI</span>
-              <span className="metric-value">{data.aqi}</span>
-              <span className="metric-sub">{category.summary}</span>
-            </div>
-            <div className="metric-card">
-              <span className="metric-label">PM2.5</span>
-              <span className="metric-value">{data.pm25.toFixed(1)}</span>
-              <span className="metric-sub">{pm25Unit}</span>
-            </div>
-            <div className="metric-card">
-              <span className="metric-label">Observed</span>
-              <span className="metric-value">{observationDetails.local}</span>
-              {observationDetails.relative && <span className="metric-sub">{observationDetails.relative}</span>}
-            </div>
-          </div>
-          <div className="insights-guidance-grid">
-            <div className="guidance-card">
-              <h3>General population</h3>
-              <p>{category.guidance.general}</p>
-            </div>
-            <div className="guidance-card">
-              <h3>Sensitive groups</h3>
-              <p>{category.guidance.sensitive}</p>
-            </div>
-          </div>
-          {stationLabel && (
-            <p className="insights-provenance">
-              Data source: <strong>{stationLabel}</strong>
-            </p>
-          )}
-          {data.health_advice && <p className="additional-health-note">{data.health_advice}</p>}
-        </div>
-      </motion.div>
-    </div>
-  );
-};
+        </motion.div>
+      </div>
+    );
+  };
+
   return (
     <div className="insights-page">
       <div className="insights-bar">
-        <button className="back-button" onClick={onBack}>
-          <span className="back-icon" aria-hidden="true">←</span>
+        <button className="back-button" onClick={onBack} type="button">
+          <span className="back-icon" aria-hidden="true">
+            ←
+          </span>
           <span>Back to search</span>
         </button>
+
         {category && (
-          <div
-            className="insights-meta-chip"
-            style={{ borderColor: category.accent, color: category.accent, background: `${category.accent}1a` }}
-          >
-            {category.label.toUpperCase()}
-          </div>
-        )}
+            <div
+              className="insights-meta-chip"
+              style={{ ['--accent' as any]: category.accent }}
+            >
+              {category.label.toUpperCase()}
+            </div>
+          )}
+
       </div>
       {content()}
     </div>
   );
 };
+
 export default InsightsPage;

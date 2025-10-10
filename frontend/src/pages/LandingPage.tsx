@@ -1,4 +1,4 @@
-import SearchBar from "../components/SearchBar";
+﻿import SearchBar from "../components/SearchBar";
 
 interface LandingPageProps {
   city: string;
@@ -13,9 +13,9 @@ const LandingPage = ({ city, error, onSearch }: LandingPageProps) => {
     <main className="landing-page">
       <div className="landing-content">
         <header className="hero">
-          <h1 className="hero-title">Breathe With Confidence</h1>
+          <h1 className="hero-title">Air Sense</h1>
           <p className="hero-subtitle">
-            Track the air quality around the world and plan your day with clarity.
+            Sense the Clear Air
           </p>
         </header>
 

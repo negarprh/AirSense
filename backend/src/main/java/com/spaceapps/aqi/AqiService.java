@@ -1,7 +1,8 @@
 package com.spaceapps.aqi;
 
-import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -20,31 +21,26 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 @Service
 public class AqiService {
 
-    private static final String DEFAULT_PM25_UNIT = "ug/m3";
-    private static final int PM25_ID = 2;
+    private static final String DEFAULT_PM25_UNIT = "µg/m³";
 
-    // API caps radius at 25 km. We’ll retry with bigger circles by issuing
-    // another query centered on the same coords and let OpenAQ pick farther stations.
-    private static final int[] RADII = {25_000, 75_000, 150_000}; // meters (25 km hard cap per call)
-    private static final int LOOKBACK_DAYS_PRIMARY = 60;
-    private static final int LOOKBACK_DAYS_FALLBACK = 120;
-
-    private final RestClient openaq;
-    private final RestClient geocode;
+    private final RestClient http;     // generic HTTP client
+    private final RestClient geocode;  // Nominatim
     private final ObjectMapper mapper = new ObjectMapper();
+    private final String owApiKey;
 
     public AqiService(
-            @Value("${OPENAQ_API_KEY:}") String apiKey,
-            @Value("${GEOCODING_USER_AGENT:EarthDataAQI/1.0 (contact@example.com)}") String ua
+            @Value("${OPENWEATHER_API_KEY:}") String owKey,
+            @Value("${GEOCODING_USER_AGENT:AirSense/1.0 (contact@example.com)}") String ua
     ) {
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException("OPENAQ_API_KEY environment variable is required.");
+        if (owKey == null || owKey.isBlank()) {
+            throw new IllegalStateException("OPENWEATHER_API_KEY environment variable is required.");
         }
-        this.openaq = RestClient.builder()
-                .baseUrl("https://api.openaq.org/v3")
+        this.owApiKey = owKey.trim();
+
+        this.http = RestClient.builder()
                 .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
-                .defaultHeader("X-API-Key", apiKey.trim())
                 .build();
+
         this.geocode = RestClient.builder()
                 .baseUrl("https://nominatim.openstreetmap.org")
                 .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
@@ -61,241 +57,75 @@ public class AqiService {
         Geo g = geocodeCity(q);
         if (g == null) return message("Unable to geocode the requested city.");
 
-        ObjectNode row = pm25LatestFromNearbySensors(g.lat, g.lon, LOOKBACK_DAYS_PRIMARY);
-        if (row == null) row = pm25LatestFromNearbySensors(g.lat, g.lon, LOOKBACK_DAYS_FALLBACK);
+        ObjectNode row = fetchFromOpenWeather(g.lat, g.lon);
+        if (row == null) return message("No air quality data available for this city.");
 
-        if (row == null || !row.hasNonNull("value")) return message("No PM2.5 data available for this city.");
-
-        double pm25 = row.path("value").asDouble();
-        int aqi = aqiFromPm25(pm25);
+        double pm25 = row.path("pm25").asDouble();
+        int aqi = aqiFromPm25(pm25); // keep US EPA 0–500 scale for your UI
 
         ObjectNode out = mapper.createObjectNode();
         out.put("query", q);
         out.put("resolved", g.display);
         out.put("pm25", pm25);
-        out.put("unit", row.path("unit").asText(DEFAULT_PM25_UNIT));
-        out.put("observedUtc", row.path("datetime").path("utc").asText(""));
+        out.put("unit", DEFAULT_PM25_UNIT);
+        out.put("observedUtc", row.path("observedUtc").asText(""));
         out.put("aqi", aqi);
         out.put("aqi_category", aqiCategory(aqi));
         out.put("health_advice", adviceForAqi(aqi));
-        // Optional: include station info if present
-        if (row.has("coordinates")) {
-            out.set("station", row.get("coordinates"));
-        } else if (row.has("locationName")) {
-            out.put("station", row.path("locationName").asText());
-        }
-        if (row.has("locationId")) out.put("stationId", row.path("locationId").asInt());
-        if (row.has("sensorId")) out.put("sensorId", row.path("sensorId").asInt());
+        // optional extras
+        out.put("country", g.country != null ? g.country : "");
         return out;
     }
 
     public ObjectNode fetchLocation(int locationId) {
-        try {
-            ObjectNode row = latestPm25ForLocation(
-                    locationId, Instant.now().minus(Duration.ofDays(LOOKBACK_DAYS_PRIMARY)));
-            if (row == null) {
-                row = latestPm25ForLocation(
-                        locationId, Instant.now().minus(Duration.ofDays(LOOKBACK_DAYS_FALLBACK)));
-            }
-            if (row == null) return message("No PM2.5 data available for this location.");
-
-            double pm25 = row.path("value").asDouble();
-            int aqi = aqiFromPm25(pm25);
-
-            ObjectNode out = mapper.createObjectNode();
-            out.put("locationId", locationId);
-            out.put("pm25", pm25);
-            out.put("unit", row.path("unit").asText(DEFAULT_PM25_UNIT));
-            out.put("observedUtc", row.path("datetime").path("utc").asText(""));
-            out.put("aqi", aqi);
-            out.put("aqi_category", aqiCategory(aqi));
-            out.put("health_advice", adviceForAqi(aqi));
-            if (row.has("coordinates")) {
-                out.set("station", row.get("coordinates"));
-            } else if (row.has("locationName")) {
-                out.put("station", row.path("locationName").asText());
-            }
-            if (row.has("locationName")) out.put("locationName", row.path("locationName").asText());
-            if (row.has("sensorId")) out.put("sensorId", row.path("sensorId").asInt());
-            return out;
-        } catch (RestClientResponseException e) {
-            ObjectNode err = handleRestException(e);
-            return err != null ? err : message("Upstream error from OpenAQ (" + e.getStatusCode().value() + ").");
-        } catch (Exception e) {
-            return message("Unexpected error: " + e.getMessage());
-        }
+        // Not applicable with OpenWeather; keep for compatibility or remove endpoint.
+        return message("Lookup by OpenAQ locationId is not supported with OpenWeather.");
     }
 
-    /* ========================= NEARBY SENSOR LOOKUP ========================= */
+    /* ========================= OpenWeather fetch ========================= */
 
-    private ObjectNode pm25LatestFromNearbySensors(double lat, double lon, int lookbackDays) {
-        ArrayNode locs = findNearbyLocations(lat, lon, 60, 25_000); // max per docs
-        if (locs == null || locs.isEmpty()) return null;
-
-        Instant threshold = Instant.now().minus(Duration.ofDays(lookbackDays));
-        Instant bestTs = null;
-        ObjectNode best = null;
-
-        for (JsonNode loc : locs) {
-            int locationId = loc.path("id").asInt(-1);
-            if (locationId <= 0) continue;
-
-            ObjectNode candidate = latestPm25ForLocation(locationId, threshold);
-            if (candidate == null || !candidate.hasNonNull("value")) continue;
-
-            if (loc.hasNonNull("name")) candidate.put("locationName", loc.path("name").asText());
-            if (loc.has("coordinates") && !candidate.has("coordinates")) {
-                candidate.set("coordinates", loc.get("coordinates"));
-            }
-            if (candidate.path("locationId").asInt(-1) <= 0) {
-                candidate.put("locationId", locationId);
-            }
-
-            Instant ts = parseUtc(candidate.path("datetime").path("utc").asText(null));
-            if (ts == null) continue;
-
-            if (bestTs == null || ts.isAfter(bestTs)) {
-                bestTs = ts;
-                best = candidate;
-            }
-        }
-        return best;
-    }
-
-    private ObjectNode latestPm25ForLocation(int locationId, Instant threshold) {
-        String url = UriComponentsBuilder.fromPath("/locations/{id}/sensors")
-                .queryParam("parameter_id", PM25_ID)
-                .queryParam("limit", 6)
-                .buildAndExpand(locationId)
-                .toUriString();
+    private ObjectNode fetchFromOpenWeather(double lat, double lon) {
         try {
-            JsonNode root = openaq.get().uri(url).retrieve().body(JsonNode.class);
-            ArrayNode sensors = asArray(root, "results");
-            if (sensors == null || sensors.isEmpty()) return null;
+            String url = UriComponentsBuilder
+                    .fromHttpUrl("https://api.openweathermap.org/data/2.5/air_pollution")
+                    .queryParam("lat", String.format(Locale.US, "%.6f", lat))
+                    .queryParam("lon", String.format(Locale.US, "%.6f", lon))
+                    .queryParam("appid", owApiKey)
+                    .queryParam("_ts", System.currentTimeMillis()) // cache buster
+                    .toUriString();
 
-            Instant bestTs = null;
-            ObjectNode best = null;
+            JsonNode root = http.get().uri(url).retrieve().body(JsonNode.class);
+            ArrayNode list = (root != null && root.get("list") instanceof ArrayNode) ? (ArrayNode) root.get("list") : null;
+            if (list == null || list.isEmpty()) return null;
 
-            for (JsonNode sensor : sensors) {
-                JsonNode parameter = sensor.path("parameter");
-                if (parameter.path("id").asInt(-1) != PM25_ID) continue;
+            JsonNode entry = list.get(0);
+            JsonNode comps = entry.path("components");
+            if (comps == null || comps.isMissingNode()) return null;
 
-                JsonNode latest = sensor.path("latest");
-                double value = latest.path("value").asDouble(Double.NaN);
-                String utc = latest.path("datetime").path("utc").asText(null);
-                Instant ts = parseUtc(utc);
+            double pm25 = comps.path("pm2_5").asDouble(Double.NaN);
+            if (Double.isNaN(pm25)) return null;
 
-                ObjectNode row;
-                if (Double.isNaN(value) || ts == null || (threshold != null && ts.isBefore(threshold))) {
-                    row = fetchLatestMeasurementForSensor(sensor.path("id").asInt(-1), threshold);
-                    if (row == null) continue;
-                    utc = row.path("datetime").path("utc").asText(null);
-                    ts = parseUtc(utc);
-                    if (ts == null || (threshold != null && ts.isBefore(threshold))) continue;
-                } else {
-                    row = mapper.createObjectNode();
-                    row.put("value", value);
-                    row.put("unit", parameter.path("units").asText(DEFAULT_PM25_UNIT));
-                    ObjectNode dt = mapper.createObjectNode();
-                    dt.put("utc", utc != null ? utc : "");
-                    row.set("datetime", dt);
-                    JsonNode coords = latest.path("coordinates");
-                    if (coords != null && coords.isObject()) row.set("coordinates", coords);
-                }
-
-                row.put("sensorId", sensor.path("id").asInt());
-                if (sensor.hasNonNull("name")) row.put("sensorName", sensor.path("name").asText());
-                row.put("locationId", locationId);
-                if (sensor.hasNonNull("locationName")) row.put("locationName", sensor.path("locationName").asText());
-                if (!row.has("unit")) row.put("unit", parameter.path("units").asText(DEFAULT_PM25_UNIT));
-
-                if (bestTs == null || ts.isAfter(bestTs)) {
-                    bestTs = ts;
-                    best = row;
-                }
-            }
-            return best;
-        } catch (RestClientResponseException e) {
-            if (e.getStatusCode().value() == 401 || e.getStatusCode().value() == 429) throw e;
-            return null;
-        } catch (Exception ignore) {
-            return null;
-        }
-    }
-
-    private ArrayNode findNearbyLocations(double lat, double lon, int limit, int radiusMeters) {
-        String coords = String.format(Locale.US, "%.6f,%.6f", lat, lon); // lat,lon
-        String url = UriComponentsBuilder.fromPath("/locations")
-                .queryParam("coordinates", coords)
-                .queryParam("radius", radiusMeters) // must be <= 25_000 per call
-                .queryParam("limit", limit)
-                .queryParam("parameter_id", PM25_ID)
-                .queryParam("order_by", "distance")
-                .queryParam("sort", "asc")
-                .build().toUriString();
-        try {
-            JsonNode root = openaq.get().uri(url).retrieve().body(JsonNode.class);
-            return asArray(root, "results");
-        } catch (RestClientResponseException e) {
-            if (e.getStatusCode().value() == 401 || e.getStatusCode().value() == 429) throw e;
-            return null;
-        } catch (Exception ignore) {
-            return null;
-        }
-    }
-
-    private ObjectNode fetchLatestMeasurementForSensor(int sensorId, Instant threshold) {
-        if (sensorId <= 0) return null;
-
-        UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/sensors/{id}/measurements")
-                .queryParam("limit", 1)
-                .queryParam("order_by", "datetime")
-                .queryParam("sort", "desc");
-        if (threshold != null) builder.queryParam("date_from", threshold.toString());
-
-        String url = builder.buildAndExpand(sensorId).toUriString();
-        try {
-            JsonNode root = openaq.get().uri(url).retrieve().body(JsonNode.class);
-            ArrayNode res = asArray(root, "results");
-            if (res == null || res.isEmpty()) return null;
-
-            JsonNode measurement = res.get(0);
-            double value = measurement.path("value").asDouble(Double.NaN);
-            if (Double.isNaN(value)) return null;
+            long dt = entry.path("dt").asLong(0L);
+            String isoUtc = dt > 0
+                    ? Instant.ofEpochSecond(dt).atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT)
+                    : "";
 
             ObjectNode row = mapper.createObjectNode();
-            row.put("value", value);
-
-            JsonNode parameter = measurement.path("parameter");
-            row.put("unit", parameter.path("units").asText(DEFAULT_PM25_UNIT));
-
-            String utc = null;
-            JsonNode period = measurement.path("period");
-            if (period.has("datetimeTo")) utc = period.path("datetimeTo").path("utc").asText(null);
-            if (utc == null && period.has("datetimeFrom")) utc = period.path("datetimeFrom").path("utc").asText(null);
-            if (utc == null) utc = measurement.path("datetime").path("utc").asText(null);
-
-            ObjectNode dt = mapper.createObjectNode();
-            dt.put("utc", utc != null ? utc : "");
-            row.set("datetime", dt);
-
-            JsonNode coords = measurement.path("coordinates");
-            if (coords != null && coords.isObject()) row.set("coordinates", coords);
-
+            row.put("pm25", pm25);
+            row.put("observedUtc", isoUtc);
             return row;
         } catch (RestClientResponseException e) {
-            if (e.getStatusCode().value() == 401 || e.getStatusCode().value() == 429) throw e;
-            return null;
-        } catch (Exception ignore) {
+            return message("OpenWeather error: " + e.getStatusCode().value());
+        } catch (Exception e) {
             return null;
         }
     }
 
-    /* ========================= GEOCODING ========================= */
+    /* ========================= Geocoding ========================= */
 
     private static final class Geo {
-        final double lat, lon; final String display;
-        Geo(double lat, double lon, String display) { this.lat = lat; this.lon = lon; this.display = display; }
+        final double lat, lon; final String display; final String country;
+        Geo(double lat, double lon, String display, String country) { this.lat = lat; this.lon = lon; this.display = display; this.country = country; }
     }
 
     private Geo geocodeCity(String city) {
@@ -313,41 +143,20 @@ public class AqiService {
             double lat = Double.parseDouble(n.path("lat").asText());
             double lon = Double.parseDouble(n.path("lon").asText());
             String display = n.path("display_name").asText(city);
-            return new Geo(lat, lon, display);
-        } catch (RestClientResponseException e) {
-            if (e.getStatusCode().value() == 401 || e.getStatusCode().value() == 429) throw e;
-            return null;
+            String country = n.path("address").path("country").asText("");
+            return new Geo(lat, lon, display, country);
         } catch (Exception ignore) {
             return null;
         }
     }
 
-    /* ========================= BUILDERS & UTIL ========================= */
-
-    private ArrayNode asArray(JsonNode root, String field) {
-        if (root == null) return null;
-        JsonNode node = root.get(field);
-        return (node instanceof ArrayNode) ? (ArrayNode) node : null;
-    }
-
-    private Instant parseUtc(String s) {
-        try { return (s == null || s.isBlank()) ? null : Instant.parse(s); }
-        catch (Exception e) { return null; }
-    }
+    /* ========================= Util & AQI ========================= */
 
     private ObjectNode message(String msg) {
         return mapper.createObjectNode().put("message", msg);
     }
 
-    private ObjectNode handleRestException(RestClientResponseException e) {
-        int status = e.getStatusCode().value();
-        if (status == 401) return message("Invalid OpenAQ API key.");
-        if (status == 429) return message("Rate limited by OpenAQ. Try again soon.");
-        return null;
-    }
-
-    /* ========================= AQI (US EPA PM2.5) ========================= */
-
+    // US EPA PM2.5 → AQI (0–500)
     private int aqiFromPm25(double concentration) {
         double c = Math.floor(concentration * 10.0) / 10.0;
         double[] cLow  = { 0.0, 12.1, 35.5, 55.5, 150.5, 250.5, 350.5 };
