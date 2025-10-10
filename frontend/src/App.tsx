@@ -1,87 +1,64 @@
-﻿import { useState } from "react";
-import { api, AqiResponse, AdviceResponse } from "./api";
-import SearchBar from "./components/SearchBar";
-import AqiResult from "./components/AqiResult";
+import { useState } from "react";
+import { Route, Routes, useNavigate } from "react-router-dom";
+import LandingPage from "./pages/LandingPage";
+import InsightsPage from "./pages/InsightsPage";
 import backgroundVisual from "/images/background.jpg";
 
 function App() {
   const [city, setCity] = useState("Los Angeles");
-  const [asthma, setAsthma] = useState(false);
-  const [aqiData, setAqiData] = useState<AqiResponse | null>(null);
-  const [adviceData, setAdviceData] = useState<AdviceResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [landingError, setLandingError] = useState<string | null>(null);
 
-  const fetchData = async (searchCity: string, asthmaFlag: boolean) => {
-    const trimmed = searchCity.trim();
-    if (!trimmed) {
-      setError("Please enter a city name.");
+  const navigate = useNavigate();
+
+  const beginSearchFromLanding = (nextCity: string) => {
+    if (!nextCity) {
+      setLandingError("Please enter a city name.");
       setHasSearched(false);
-      setAqiData(null);
-      setAdviceData(null);
       return;
     }
 
-    setLoading(true);
-    setError(null);
-
-    try {
-      const aqiResponse = await api.get<AqiResponse>("/api/aqi", {
-        params: { city: trimmed }
-      });
-      setAqiData(aqiResponse.data);
-
-      const adviceResponse = await api.get<AdviceResponse>("/api/advice", {
-        params: { city: trimmed, asthma: asthmaFlag }
-      });
-      setAdviceData(adviceResponse.data);
-      setHasSearched(true);
-    } catch (err) {
-      console.error(err);
-      setError("Unable to fetch air quality right now. Try again in a moment.");
-      setHasSearched(true);
-      setAqiData(null);
-      setAdviceData(null);
-    } finally {
-      setLoading(false);
-    }
+    setLandingError(null);
+    setCity(nextCity);
+    setHasSearched(true);
+    navigate("/insights");
   };
 
-  const handleSearch = (searchCity: string, asthmaFlag: boolean) => {
-    setCity(searchCity);
-    setAsthma(asthmaFlag);
-    void fetchData(searchCity, asthmaFlag);
+  const handleBackToSearch = () => {
+    setHasSearched(false);
+    setLandingError(null);
+    setCity("");
+    navigate("/");
   };
-
-  const resultActive = hasSearched || loading || !!error;
 
   return (
     <div className="app-background" style={{ backgroundImage: `url(${backgroundVisual})` }}>
       <div className="app-overlay">
-        <header className="hero">
-          <h1 className="hero-title">Welcome to AirSense</h1>
-          <p>Where you can sense the clear air</p>
-        </header>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <LandingPage
+                city={city}
+                error={landingError}
+                onSearch={beginSearchFromLanding}
+              />
+            }
+          />
+       
+          <Route
+            path="/insights"
+            element={
+              <InsightsPage
+                key={city}              // <— forces a fresh mount on city change
+                city={city}
+                hasSearched={hasSearched}
+                onBack={handleBackToSearch}
+              />
+            }
+          />
 
-        <SearchBar
-          city={city}
-          asthma={asthma}
-          onSearch={handleSearch}
-          loading={loading}
-        />
-
-        {resultActive && (
-          <div className={`result-wrapper ${resultActive ? "visible" : ""}`}>
-            <AqiResult
-              aqi={aqiData}
-              advice={adviceData}
-              asthma={asthma}
-              error={error}
-              loading={loading}
-            />
-          </div>
-        )}
+        </Routes>
       </div>
     </div>
   );
