@@ -45,6 +45,10 @@ export const api = axios.create({
 
 export type StationCoords = { latitude: number; longitude: number };
 
+export interface ForecastPoint { t: string; pm25: number; aqi: number; }
+export interface ForecastResponse { query?: string; resolved?: string; points: ForecastPoint[]; message?: string; }
+
+
 export interface AqiResponse {
   city?: string;
   resolved?: string;

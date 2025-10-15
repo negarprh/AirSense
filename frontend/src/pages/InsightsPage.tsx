@@ -1,6 +1,8 @@
+// src/pages/InsightsPage.tsx
 import { CSSProperties, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { api, AqiResponse, StationCoords } from "../api";
+import { api, AqiResponse, StationCoords, ForecastResponse } from "../api";
+import ForecastChart from "../components/ForecastChart";
 
 interface InsightsPageProps {
   city: string;
@@ -161,7 +163,6 @@ const formatDistance = (meters?: number | null) => {
   return `${Math.round(meters)} m away`;
 };
 
-// helper to convert hex to rgba transparency
 const hexToRgba = (hex: string, a: number) => {
   const h = hex.replace("#", "");
   const r = parseInt(h.slice(0, 2), 16);
@@ -170,9 +171,9 @@ const hexToRgba = (hex: string, a: number) => {
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 };
 
-
 const InsightsPage = ({ city, hasSearched, onBack }: InsightsPageProps) => {
   const [data, setData] = useState<AqiResponse | null>(null);
+  const [forecast, setForecast] = useState<ForecastResponse | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -181,25 +182,50 @@ const InsightsPage = ({ city, hasSearched, onBack }: InsightsPageProps) => {
 
     const controller = new AbortController();
 
-    const load = async () => {
-      setLoading(true);
-      setFetchError(null);
+   // inside useEffect
+const load = async () => {
+  setLoading(true);
+  setFetchError(null);
+  setData(null);
+  setForecast(null);
+
+  try {
+    // 1) Current conditions (authoritative)
+    const current = await api.get<AqiResponse>("/api/aqi", {
+      params: { city, _ts: Date.now() },
+      signal: controller.signal
+    });
+
+    if (current.data?.message) {
+      // invalid/unknown city from backend
       setData(null);
-      try {
-        const response = await api.get<AqiResponse>("/api/aqi", {
-          params: { city, _ts: Date.now() },
-          signal: controller.signal
-        });
-        setData(response.data);
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          console.error(error);
-          setFetchError("Unable to fetch air quality right now. Try again in a moment.");
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    };
+      setFetchError(current.data.message || "City not found. Please check the spelling.");
+      return; // <- we'll also clear loading in the outer finally
+    }
+
+    setData(current.data);
+
+    // 2) Forecast (best-effort)
+    try {
+      const f = await api.get<ForecastResponse>("/api/forecast", {
+        params: { city, _ts: Date.now() },
+        signal: controller.signal
+      });
+      if (!f.data?.message) setForecast(f.data);
+    } catch (err) {
+      console.warn("Forecast fetch failed:", err);
+    }
+  } catch (err) {
+    if (!controller.signal.aborted) {
+      console.error(err);
+      setFetchError("Unable to fetch air quality. Please check the city name and try again.");
+    }
+  } finally {
+    if (!controller.signal.aborted) setLoading(false); // <- ALWAYS clears the spinner
+  }
+};
+
+
 
     void load();
     return () => controller.abort();
@@ -303,10 +329,23 @@ const InsightsPage = ({ city, hasSearched, onBack }: InsightsPageProps) => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <div className="insights-photo" style={{ borderColor: `${accent}33` }}>
-            <img src={`/images/${category.image}.jpg`} alt={`${category.label} air quality visual`} />
-          </div>
+    {/* PHOTO + CHART (stacked) */}
+    <div className="media-col">
+      <div className="insights-photo" style={{ borderColor: `${accent}33` }}>
+        <img src={`/images/${category.image}.jpg`} alt={`${category.label} air quality visual`} />
+      </div>
 
+      {forecast?.points?.length ? (
+        <div className="forecast-container">
+          <h3 className="forecast-title">Future Days Forecast</h3>
+          <ForecastChart data={forecast.points} />
+        </div>
+      ) : null}
+    </div>
+
+
+
+          {/* Main card */}
           <div className="typing-card" style={cardStyle}>
             <span className="typing-kicker" style={{ color: category.accent }}>
               {category.label} air quality
@@ -323,23 +362,24 @@ const InsightsPage = ({ city, hasSearched, onBack }: InsightsPageProps) => {
 
             <div className="insights-metrics">
               <div
-  className="metric-card metric-card--accent"
-  style={{
-    borderColor: hexToRgba(accent, 0.6),
-    background: `linear-gradient(160deg, ${hexToRgba(accent, 0.35)} 0%, rgba(6,16,32,0.9) 90%)`,
-    boxShadow: `0 18px 46px ${hexToRgba(accent, 0.22)}`
-  }}
->
-  <span className="metric-label">AQI</span>
-  <span className="metric-value">{data.aqi}</span>
-  <span className="metric-sub">{category.summary}</span>
-</div>
+                className="metric-card metric-card--accent"
+                style={{
+                  borderColor: hexToRgba(accent, 0.6),
+                  background: `linear-gradient(160deg, ${hexToRgba(accent, 0.35)} 0%, rgba(6,16,32,0.9) 90%)`,
+                  boxShadow: `0 18px 46px ${hexToRgba(accent, 0.22)}`
+                }}
+              >
+                <span className="metric-label">AQI</span>
+                <span className="metric-value">{data.aqi}</span>
+                <span className="metric-sub">{category.summary}</span>
+              </div>
 
               <div className="metric-card">
                 <span className="metric-label">PM2.5</span>
                 <span className="metric-value">{data.pm25.toFixed(1)}</span>
                 <span className="metric-sub">{pm25Unit}</span>
               </div>
+
               <div className="metric-card">
                 <span className="metric-label">Observed</span>
                 <span className="metric-value">{observationDetails.local}</span>
@@ -363,8 +403,6 @@ const InsightsPage = ({ city, hasSearched, onBack }: InsightsPageProps) => {
                 Data source: <strong>{stationLabel}</strong>
               </p>
             )}
-
-            {/* {data.health_advice && <p className="additional-health-note">{data.health_advice}</p>} */}
           </div>
         </motion.div>
       </div>
@@ -375,21 +413,15 @@ const InsightsPage = ({ city, hasSearched, onBack }: InsightsPageProps) => {
     <div className="insights-page">
       <div className="insights-bar">
         <button className="back-button" onClick={onBack} type="button">
-          <span className="back-icon" aria-hidden="true">
-            ←
-          </span>
+          <span className="back-icon" aria-hidden="true">←</span>
           <span>Back to search</span>
         </button>
 
         {category && (
-            <div
-              className="insights-meta-chip"
-              style={{ ['--accent' as any]: category.accent }}
-            >
-              {category.label.toUpperCase()}
-            </div>
-          )}
-
+          <div className="insights-meta-chip" style={{ ["--accent" as any]: category.accent }}>
+            {category.label.toUpperCase()}
+          </div>
+        )}
       </div>
       {content()}
     </div>

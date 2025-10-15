@@ -22,4 +22,15 @@ public class AqiController {
                 .cacheControl(CacheControl.noStore())
                 .body(body);
     }
+
+    @GetMapping("/forecast")
+    public ResponseEntity<JsonNode> getForecast(@RequestParam String city) {
+        if (!StringUtils.hasText(city)) return ResponseEntity.badRequest().build();
+        JsonNode body = service.fetchForecastByCity(city);
+        HttpStatus status = body.has("message") ? HttpStatus.NOT_FOUND : HttpStatus.OK;
+        return ResponseEntity.status(status).body(body);
+    }
 }
+
+
+

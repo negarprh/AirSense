@@ -1,42 +1,21 @@
-﻿interface ForecastPoint {
-  label: string;
-  value: number;
-  band: string;
-  color: string;
-}
+﻿import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import dayjs from "dayjs";
 
-interface ForecastChartProps {
-  forecast: ForecastPoint[];
-}
-
-const ForecastChart = ({ forecast }: ForecastChartProps) => {
-  if (!forecast.length) {
-    return <p className="forecast-empty">Forecast data unavailable.</p>;
-  }
-
-  const maxValue = Math.max(...forecast.map((point) => point.value), 1);
-
+type P = { data: { t: string; aqi: number; pm25: number }[] };
+export default function ForecastChart({ data }: P) {
+  const fmt = (iso: string) => dayjs(iso).format("MMM D HH:mm");
   return (
-    <div className="forecast-chart">
-      {forecast.map((point) => (
-        <div className="forecast-bar" key={point.label}>
-          <div className="forecast-bar-visual" aria-hidden>
-            <div
-              className="forecast-bar-fill"
-              style={{
-                height: `${Math.max(20, (point.value / maxValue) * 100)}%`,
-                background: `linear-gradient(180deg, ${point.color}E6, ${point.color}99)`
-              }}
-            />
-          </div>
-          <span className="forecast-value">{point.value}</span>
-          <span className="forecast-label">{point.label}</span>
-          <span className="forecast-band">{point.band}</span>
-        </div>
-      ))}
+    <div style={{ width: "100%", height: 320 }}>
+      <ResponsiveContainer>
+        <LineChart data={data}>
+          <XAxis dataKey="t" tickFormatter={fmt} minTickGap={24} />
+          <YAxis yAxisId="left" domain={[0, 500]} />
+          <YAxis yAxisId="right" orientation="right" />
+          <Tooltip labelFormatter={(v) => fmt(String(v))} />
+          <Line type="monotone" dataKey="aqi" yAxisId="left" dot={false}/>
+          <Line type="monotone" dataKey="pm25" yAxisId="right" dot={false}/>
+        </LineChart>
+      </ResponsiveContainer>
     </div>
   );
-};
-
-export type { ForecastPoint };
-export default ForecastChart;
+}

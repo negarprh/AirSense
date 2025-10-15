@@ -6,6 +6,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+
 
 @Service
 public class AqiService {
@@ -50,12 +52,19 @@ public class AqiService {
 
     /* ========================= PUBLIC API ========================= */
 
+        @Cacheable(
+        value = "aqiByCity",
+        key = "T(org.springframework.util.StringUtils).trimAllWhitespace(#cityQuery).toLowerCase()",
+        unless = "#result == null || #result.has('message')" // don't cache errors
+    )
+
+
     public ObjectNode fetchByCity(String cityQuery) {
         String q = cityQuery == null ? "" : cityQuery.trim();
         if (q.isEmpty()) return message("City is required.");
 
         Geo g = geocodeCity(q);
-        if (g == null) return message("Unable to geocode the requested city.");
+        if (g == null) return message("City not found. Please check the spelling or try a nearby major city.");
 
         ObjectNode row = fetchFromOpenWeather(g.lat, g.lon);
         if (row == null) return message("No air quality data available for this city.");
@@ -136,8 +145,13 @@ public class AqiService {
                     .queryParam("limit", 1)
                     .queryParam("addressdetails", 1)
                     .build().toUriString();
+
             JsonNode root = geocode.get().uri(url).retrieve().body(JsonNode.class);
-            if (!(root instanceof ArrayNode arr) || arr.isEmpty()) return null;
+
+            if (!(root instanceof ArrayNode arr) || arr.isEmpty()) {
+                
+                return null;
+            }
 
             JsonNode n = arr.get(0);
             double lat = Double.parseDouble(n.path("lat").asText());
@@ -145,10 +159,58 @@ public class AqiService {
             String display = n.path("display_name").asText(city);
             String country = n.path("address").path("country").asText("");
             return new Geo(lat, lon, display, country);
-        } catch (Exception ignore) {
+        } catch (Exception e) {
             return null;
         }
     }
+
+
+        
+
+    // add method in AqiService
+    public ObjectNode fetchForecastByCity(String cityQuery) {
+        String q = cityQuery == null ? "" : cityQuery.trim();
+        if (q.isEmpty()) return message("City is required.");
+
+        Geo g = geocodeCity(q);
+        if (g == null) return message("City not found. Please enter a valid city name.");
+
+        try {
+            String url = UriComponentsBuilder
+                .fromHttpUrl("https://api.openweathermap.org/data/2.5/air_pollution/forecast")
+                .queryParam("lat", String.format(Locale.US, "%.6f", g.lat))
+                .queryParam("lon", String.format(Locale.US, "%.6f", g.lon))
+                .queryParam("appid", owApiKey) // use the same field you used for current data
+                .toUriString();
+
+            JsonNode root = http.get().uri(url).retrieve().body(JsonNode.class);
+            ArrayNode list = (root != null && root.get("list") instanceof ArrayNode) ? (ArrayNode) root.get("list") : null;
+            if (list == null || list.isEmpty()) return message("No forecast available.");
+
+            ArrayNode points = mapper.createArrayNode();
+            for (JsonNode n : list) {
+                long dt = n.path("dt").asLong(0);
+                double pm25 = n.path("components").path("pm2_5").asDouble(Double.NaN);
+                if (dt == 0 || Double.isNaN(pm25)) continue;
+                int aqi = aqiFromPm25(pm25); // keep US EPA 0–500 for UI
+                ObjectNode p = mapper.createObjectNode();
+                p.put("t", Instant.ofEpochSecond(dt).toString());
+                p.put("pm25", pm25);
+                p.put("aqi", aqi);
+                points.add(p);
+            }
+            if (points.isEmpty()) return message("No forecast available.");
+
+            ObjectNode out = mapper.createObjectNode();
+            out.put("query", q);
+            out.put("resolved", g.display);
+            out.set("points", points);
+            return out;
+        } catch (Exception e) {
+            return message("OpenWeather forecast error.");
+        }
+    }
+
 
     /* ========================= Util & AQI ========================= */
 
