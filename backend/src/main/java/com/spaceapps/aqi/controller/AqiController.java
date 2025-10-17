@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping(value = "/api", produces = MediaType.APPLICATION_JSON_VALUE)
-@CrossOrigin(origins = "*")
+// @CrossOrigin(origins = "http://airsense-app.s3-website.ca-central-1.amazonaws.com")
 public class AqiController {
     private final AqiService service;
     public AqiController(AqiService service) { this.service = service; }

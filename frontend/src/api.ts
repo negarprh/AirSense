@@ -1,11 +1,8 @@
 ﻿// api.ts
 import axios from "axios";
 
-/**
- * Resolves the backend base URL dynamically:
- * - Prefers VITE_API_BASE from environment
- * - Fallback: same host on port 8080
- */
+
+
 function resolveBase(): string {
   const env = (import.meta.env.VITE_API_BASE as string | undefined)?.trim();
   const { protocol, hostname } = window.location;
@@ -40,7 +37,7 @@ function resolveBase(): string {
 
 export const api = axios.create({
   baseURL: resolveBase(),
-  headers: { "Cache-Control": "no-cache" },
+  // headers: { "Cache-Control": "no-cache" },
 });
 
 export type StationCoords = { latitude: number; longitude: number };
@@ -69,3 +66,5 @@ export interface AqiResponse {
   health_advice?: string;
   message?: string;
 }
+
+console.log("API base =", resolveBase());
