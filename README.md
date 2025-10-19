@@ -1,6 +1,6 @@
 # 🌍 AirSense - Predicting Cleaner, Safer Skies
 
-**Built for the NASA Space Apps Challenge 2025: “From EarthData to Action — Cloud Computing with Earth Observation Data”** 🚀
+**Built for the NASA Space Apps Challenge 2025: “From EarthData to Action - Cloud Computing with Earth Observation Data”** 🚀
 
 AirSense is a **web-based air quality forecasting platform** designed for the **NASA Space Apps Challenge 2025**.
 It combines **real-time air quality**, **weather**, and **forecast data** to help users stay informed about pollution levels and protect public health.
