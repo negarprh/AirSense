@@ -10,7 +10,7 @@ Inspired by NASA’s **TEMPO mission**, AirSense demonstrates how **Earth observ
 
 ## 📡 Live Demo
 
-🌐 **Live Link:** [https://airsenseapp.org](https://airsenseapp.org) *(coming soon)*
+🌐 **Live Link:** [airsenseapp.org](https://airsenseapp.org)
 
 ---
 
