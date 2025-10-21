@@ -57,7 +57,7 @@ Inspired by NASA’s **TEMPO mission**, AirSense demonstrates how **Earth observ
 | Category                              | Description                                                                  |
 | ------------------------------------- | ---------------------------------------------------------------------------- |
 | 🌬 **Live AQI Data**                  | Retrieves current air quality using OpenWeather & ground station data.       |
-| 🔮 **3-Day Forecast**                 | Predictive hourly air quality forecasting based on real meteorological data. |
+| 🔮 **4-Day Forecast**                 | Predictive hourly air quality forecasting based on real meteorological data. |
 | ☁️ **Serverless Cloud Architecture**  | Built using AWS Lambda, CloudFront, and S3 for scalable cloud computing.     |
 | ⚙️ **Smart Caching**                  | Reduces redundant API calls with Spring Caffeine caching.                    |
 | 💡 **Interactive Visualizations**     | Dynamic charts for pollution trends and forecasts.                           |
