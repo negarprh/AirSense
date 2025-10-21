@@ -357,6 +357,24 @@ font-family: "Rubik Distressed", "Segoe UI", system-ui, sans-serif; }
   height: 150px;
 }
 
+.forecast-title{
+    
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(240, 248, 255, 0.85);
+  /* background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px); */
+  border-radius: 1rem;
+  font-weight: 700;
+  margin: 0 auto;
+  text-align: center;
+}
+
+
+
 .forecast-bar {
   flex: 1;
   display: flex;
@@ -1000,5 +1018,27 @@ font-family: "Rubik Distressed", "Segoe UI", system-ui, sans-serif; }
     font-size: .95rem;
     padding: 0 1.25rem;
     border-radius: 1.1rem;
+  }
+
+  .insights-photo {
+    max-height: none;              /* remove desktop clamp limit */
+    height: clamp(350px, 65vw, 480px); /* make taller on mobile */
+  }
+
+  .insights-photo img {
+    min-height: 400px;             /* ensure image fills the new height */
+    object-fit: cover;
+  }
+
+    .insights-output-shell {
+    flex-direction: column-reverse;
+  }
+
+  .media-col {
+    order: 2; /* move photo/forecast after the card */
+  }
+
+  .typing-card {
+    order: 1;
   }
 }
