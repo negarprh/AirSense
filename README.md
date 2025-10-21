@@ -24,9 +24,9 @@ Inspired by NASA’s **TEMPO mission**, AirSense demonstrates how **Earth observ
 
 ## 🖼️ Screenshots
 
-| City Dashboard                  | 4-Day Forecast Visualization            |
+| Main Page                       | City Dashboard                          |
 | ------------------------------- | --------------------------------------- |
-| ![Home](./screenshots/home.png) | ![Forecast](./screenshots/forecast.png) |
+| ![Home](./demo/Home.png) | ![AQI Dashboard](./demo/Insight.png) |
 
 ---
 
