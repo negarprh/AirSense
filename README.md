@@ -1,7 +1,32 @@
-# 🌍 AirSense - Live Air Quality & Forecast Platform - NASA App Challenge Hackathon 2025
+# 🌍 AirSense - Predicting Cleaner, Safer Skies
 
-AirSense delivers live air quality insights, forecasts, and historical analytics for any city. It is built for the NASA App Challenge Hackathon 2025.
-It combines **React**, **Spring Boot**, and **OpenWeather APIs** inside a **Dockerized**, cloud-ready architecture deployed on **AWS (App Runner + S3)**.
+**Built for the NASA Space Apps Challenge 2025: “From EarthData to Action - Cloud Computing with Earth Observation Data”** 🚀
+
+AirSense is a **web-based air quality forecasting platform** designed for the **NASA Space Apps Challenge 2025**.
+It combines **real-time air quality**, **weather**, and **forecast data** to help users stay informed about pollution levels and protect public health.
+Inspired by NASA’s **TEMPO mission**, AirSense demonstrates how **Earth observation + cloud computing** can work together to build cleaner, safer skies.
+
+---
+
+## 📡 Live Demo
+
+🌐 **Live Link:** [airsenseapp.org](https://airsenseapp.org)
+
+---
+
+## 🎥 Demo Video
+
+🎬 **Watch the Demo:** ![AirSense Demo](./demo/demo.gif)
+
+*Showing live AQI monitoring, forecast trends, and city-level analytics powered by OpenWeather & AWS Lambda.*
+
+---
+
+## 🖼️ Screenshots
+
+| City Dashboard                  | 4-Day Forecast Visualization            |
+| ------------------------------- | --------------------------------------- |
+| ![Home](./screenshots/home.png) | ![Forecast](./screenshots/forecast.png) |
 
 ---
 
@@ -10,49 +35,58 @@ It combines **React**, **Spring Boot**, and **OpenWeather APIs** inside a **Dock
 **Frontend**
 
 * React + TypeScript + Vite
-* Recharts (for data visualization)
+* Recharts (for visualization)
 * Axios + Framer Motion
 
 **Backend**
 
 * Spring Boot (Java 21)
-* RESTful API with Swagger Docs
-* Caffeine Caching
-* PostgreSQL (Neon / Supabase / AWS RDS)
-* Spring Actuator for health endpoints
+* RESTful API + Swagger Docs
+* Caffeine in-memory caching
 
 **Infrastructure**
 
-* Docker & Docker Compose
-* AWS App Runner (backend)
-* AWS S3 + CloudFront (frontend hosting)
-* Optional Route 53 custom domain
+* AWS Lambda (serverless backend)
+* AWS S3 + CloudFront (secure frontend hosting + HTTPS via ACM)
+* Docker for local development
 
 ---
 
 ## 🌦️ Features
 
-| Category                 | Description                                                    |
-| ------------------------ | -------------------------------------------------------------- |
-| 🌬 **Live AQI Data**     | Retrieves current air pollution data from OpenWeather API.     |
-| 🔮 **Forecast**          | 4-day hourly forecast using OpenWeather’s predictive endpoint. |
-| 📊 **History Tracking**  | Stores and visualizes AQI trends (24 h / 7 d) in PostgreSQL.   |
-| ⚙️ **Caching Layer**     | Reduces redundant API calls with in-memory Caffeine cache.     |
-| 💡 **API Docs & Health** | Swagger UI + Spring Actuator /health & /metrics endpoints.     |
-| ☁️ **Cloud Deployment**  | Fully containerized → AWS App Runner & S3 production ready.    |
+| Category                              | Description                                                                  |
+| ------------------------------------- | ---------------------------------------------------------------------------- |
+| 🌬 **Live AQI Data**                  | Retrieves current air quality using OpenWeather & ground station data.       |
+| 🔮 **3-Day Forecast**                 | Predictive hourly air quality forecasting based on real meteorological data. |
+| ☁️ **Serverless Cloud Architecture**  | Built using AWS Lambda, CloudFront, and S3 for scalable cloud computing.     |
+| ⚙️ **Smart Caching**                  | Reduces redundant API calls with Spring Caffeine caching.                    |
+| 💡 **Interactive Visualizations**     | Dynamic charts for pollution trends and forecasts.                           |
+| 🛰️ **Aligned with NASA TEMPO Goals** | Encourages clean-air decision-making via public data integration.            |
+
+---
+
+## 🧠 Challenge Alignment — NASA “From EarthData to Action”
+
+AirSense directly addresses NASA’s **Challenge #15: From EarthData to Action** by demonstrating:
+✅ **Cloud Computing Integration:** Runs serverlessly on AWS (Lambda + CloudFront), scaling automatically.
+✅ **Earth Observation Data Fusion:** Uses OpenWeather (ground + satellite fusion) for air quality + forecast data.
+✅ **Public Health Awareness:** Provides easy-to-understand AQI visuals and personalized city-based results.
+✅ **Scalable Web Architecture:** Delivers near real-time environmental data with responsive visualizations.
+
+> 🛰️ *Inspired by NASA’s TEMPO satellite mission — monitoring North American air pollution from space.*
 
 ---
 
 ## 🧱 Architecture
 
 ```
-Frontend (React, Vite)
+Frontend (React + Vite + CloudFront)
         │
         ▼
-Backend API (Spring Boot)
+Backend API (Spring Boot → AWS Lambda)
         │
-        ├── OpenWeather API  ← AQI & forecast data
-        ├── PostgreSQL (Neon/Supabase/RDS)
+        ├── OpenWeather API (Live AQI + Forecast)
+        ├── Optional OpenAQ integration
         └── Caffeine Cache
 ```
 
@@ -84,20 +118,19 @@ docker compose up --build
 ```
 
 Then open:
-Frontend → [http://localhost:5173](http://localhost:5173)
-Backend → [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
+
+* Frontend → [http://localhost:5173](http://localhost:5173)
+* Backend → [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
 
 ---
 
 ## 🧩 API Endpoints
 
-| Endpoint                             | Method | Description            |
-| ------------------------------------ | ------ | ---------------------- |
-| `/api/aqi?city={name}`               | GET    | Current AQI for a city |
-| `/api/forecast?city={name}`          | GET    | 4-day forecast         |
-| `/api/history?city={name}&hours={n}` | GET    | Historical readings    |
-| `/actuator/health`                   | GET    | Health check           |
-| `/swagger-ui/index.html`             | —      | Interactive docs       |
+| Endpoint                    | Method | Description                 |
+| --------------------------- | ------ | --------------------------- |
+| `/api/aqi?city={name}`      | GET    | Current AQI data for a city |
+| `/api/forecast?city={name}` | GET    | 4-day air quality forecast  |
+| `/swagger-ui/index.html`    | —      | API documentation           |
 
 ---
 
@@ -119,25 +152,26 @@ Backend → [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/
 
 ## ☁️ AWS Deployment Overview
 
-* **Backend**: Docker image pushed to ECR → AWS App Runner service.
-* **Frontend**: Built React app uploaded to S3 → served via CloudFront.
-* **Database**: PostgreSQL (Neon / Supabase / AWS RDS Free Tier).
-* **Domain**: Route 53 with SSL via ACM.
+* **Backend:** Packaged JAR → AWS Lambda (serverless runtime).
+* **Frontend:** React build → hosted on S3 + distributed via CloudFront (HTTPS).
+* **SSL:** Managed by AWS Certificate Manager.
+* **Domain:** Optional Route 53 for `https://airsenseapp.org`.
 
 ---
 
 ## 🔒 Environment Variables
 
-| Variable                         | Description                 |
-| -------------------------------- | --------------------------- |
-| `OPENWEATHER_API_KEY`            | OpenWeather API token       |
-| `SERVER_PORT`                    | Backend port (default 8080) |
-| `DB_URL` / `DB_USER` / `DB_PASS` | Optional for PostgreSQL     |
-| `CACHE_TTL_MINUTES`              | Optional cache duration     |
-
+| Variable              | Description                 |
+| --------------------- | --------------------------- |
+| `OPENWEATHER_API_KEY` | OpenWeather API token       |
+| `SERVER_PORT`         | Backend port (default 8080) |
+| `CACHE_TTL_MINUTES`   | Optional cache duration     |
 
 ---
 
-## 🏆 Built For
+## 🏆 Hackathon Context
 
-**NASA Space Apps Challenge 2025 Hackathon**
+**Challenge:** *NASA Space Apps 2025 - From EarthData to Action: Predicting Cleaner, Safer Skies*
+**Focus:** Air quality forecasting using cloud computing + Earth observation data.
+**Goal:** Use cloud-based scalability to transform open-source air pollution data into actionable public health insights.
+
