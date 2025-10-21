@@ -16,7 +16,7 @@ Inspired by NASA’s **TEMPO mission**, AirSense demonstrates how **Earth observ
 
 ## 🎥 Demo Video
 
-🎬 **Watch the Demo:** ![AirSense Demo](./demo/demo.gif)
+🎬 **Watch the Demo:** ![AirSense Demo](./demo/airsense-demo.gif)
 
 *Showing live AQI monitoring, forecast trends, and city-level analytics powered by OpenWeather & AWS Lambda.*
 
